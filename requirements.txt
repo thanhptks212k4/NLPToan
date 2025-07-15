@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+faiss-cpu
+fuzzywuzzy
+python-Levenshtein
+sentence-transformers
+transformers
+torch
