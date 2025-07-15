@@ -10,8 +10,8 @@ import re
 # --- Load PhoBERT ---
 @st.cache_resource
 def load_phobert():
-    tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base", cache_dir="./phobert_cache")
-    model = AutoModel.from_pretrained("vinai/phobert-base", cache_dir="./phobert_cache")
+    tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base")
+    model = AutoModel.from_pretrained("vinai/phobert-base")
     return tokenizer, model
 
 # --- Embedding ---
@@ -89,9 +89,9 @@ df = load_data("Toan.csv")
 index, valid_idx = build_faiss_index(df, tokenizer, model)
 
 # --- Giao diện ---
-st.title("📚 Chatbot Toán học")
-st.markdown("Nhập câu hỏi lý thuyết, biểu thức toán học hoặc gõ **`Hãy cho tôi bài tập`** để bắt đầu.")
-if st.button("🧹 Xóa hội thoại"):
+st.title("Chatbot Toanhoc")
+st.markdown("Nhập câu hỏi lý thuyết, biểu thức toán học hoặc gõ: Hãy cho tôi bài tập để bắt đầu.")
+if st.button("Xóa hội thoại"):
     st.session_state.messages = []
     st.session_state.stage = "start"
     st.session_state.grade = ""
@@ -114,17 +114,17 @@ if query:
     # === Luồng bài tập ===
     if st.session_state.stage == "start" and "bài tập" in query.lower():
         st.session_state.stage = "ask_grade"
-        msg = "📌 Bạn muốn chọn **lớp mấy**?"
+        msg = "Bạn muốn chọn lớp mấy?"
 
     elif st.session_state.stage == "ask_grade":
         st.session_state.grade = query.strip()
         st.session_state.stage = "ask_topic"
-        msg = "📘 Bạn muốn chọn **chủ đề** nào? _(Đại số / Hình học)_"
+        msg = "Bạn muốn chọn chủ đề nào? (Đại số / Hình học)"
 
     elif st.session_state.stage == "ask_topic":
         st.session_state.topic = query.strip()
         st.session_state.stage = "ask_type"
-        msg = "📗 Bạn muốn chọn **thể loại** nào? _(Bài tập / Bài tập trắc nghiệm / Lý thuyết)_"
+        msg = "Bạn muốn chọn thể loại nào? (Bài tập / Bài tập trắc nghiệm / Lý thuyết)"
 
     elif st.session_state.stage == "ask_type":
         st.session_state.type = query.strip()
@@ -137,20 +137,20 @@ if query:
             row = df_filtered.sample(1).iloc[0]
             st.session_state.quiz_row = row
             st.session_state.stage = "answer_quiz"
-            msg = f"📝 **Câu hỏi**: {row['Câu hỏi']}"
+            msg = "Câu hỏi: " + row["Câu hỏi"]
         else:
             st.session_state.stage = "start"
-            msg = "❌ Không tìm thấy bài tập phù hợp. Vui lòng thử lại."
+            msg = "Không tìm thấy bài tập phù hợp. Vui lòng thử lại."
 
     elif st.session_state.stage == "answer_quiz":
         user_ans = query.strip().lower()
         correct = st.session_state.quiz_row["Câu trả lời"].strip().lower()
         if user_ans == correct:
-            msg = "✅ Chính xác!"
+            msg = "Chính xác!"
         else:
-            msg = f"❌ Chưa đúng. Đáp án đúng là: **{st.session_state.quiz_row['Câu trả lời']}**"
+            msg = "Chưa đúng. Đáp án đúng là: " + st.session_state.quiz_row["Câu trả lời"]
             if pd.notna(st.session_state.quiz_row.get("Hướng dẫn giải", "")):
-                msg += f"\n📖 **Hướng dẫn giải**: {st.session_state.quiz_row['Hướng dẫn giải']}"
+                msg += "\nHướng dẫn giải: " + st.session_state.quiz_row["Hướng dẫn giải"]
         st.session_state.stage = "start"
 
     # === Luồng lý thuyết ===
@@ -158,22 +158,22 @@ if query:
         if re.fullmatch(r"[0-9\s\+\-\*/().]+", query.strip()):
             result = evaluate_expression(query)
             if result is not None:
-                msg = f"🧮 Kết quả của biểu thức `{query}` là: **{result}**"
+                msg = "Kết quả của biểu thức " + query + " là: " + str(result)
             else:
-                msg = f"⚠️ Không thể tính toán biểu thức: `{query}`"
+                msg = "Không thể tính toán biểu thức: " + query
         else:
             emb = get_embedding(query, tokenizer, model)
             D, I = index.search(np.array([emb]).astype("float32"), 1)
             if D[0][0] > 1.0:
                 ans, hint, score = fuzzy_match(query, df)
-                msg = f"**Fuzzy Matching ({score}%)**\n\n🧠 {ans}"
+                msg = f"Kết quả fuzzy matching ({score}%):\n" + ans
                 if pd.notna(hint) and hint.strip():
-                    msg += f"\n📖 **Hướng dẫn giải**: {hint}"
+                    msg += "\nHướng dẫn giải: " + hint
             else:
                 row = df.iloc[valid_idx[I[0][0]]]
-                msg = f"🧠 **{row['Câu trả lời']}**"
+                msg = row["Câu trả lời"]
                 if pd.notna(row.get("Hướng dẫn giải", "")):
-                    msg += f"\n📖 **Hướng dẫn giải**: {row['Hướng dẫn giải']}"
+                    msg += "\nHướng dẫn giải: " + row["Hướng dẫn giải"]
 
     with st.chat_message("assistant"):
         st.markdown(msg)
